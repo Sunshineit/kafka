@@ -23,6 +23,8 @@ import org.apache.kafka.streams.processor.ProcessorSupplier;
 
 import java.util.ArrayList;
 
+import static org.junit.Assert.assertEquals;
+
 public class MockProcessorSupplier<K, V> implements ProcessorSupplier<K, V> {
 
     public final ArrayList<String> processed = new ArrayList<>();
@@ -56,4 +58,15 @@ public class MockProcessorSupplier<K, V> implements ProcessorSupplier<K, V> {
         }
 
     }
+
+    public void checkAndClearResult(String... expected) {
+        assertEquals("the number of outputs:", expected.length, processed.size());
+
+        for (int i = 0; i < expected.length; i++) {
+            assertEquals("output[" + i + "]:", expected[i], processed.get(i));
+        }
+
+        processed.clear();
+    }
+
 }

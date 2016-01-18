@@ -48,7 +48,7 @@ Overrides can also be changed or set later using the alter topic command. This e
 To remove an override you can do
 <pre>
 <b> &gt; bin/kafka-topics.sh --zookeeper localhost:2181 --alter --topic my-topic
-    --deleteConfig max.message.bytes</b>
+    --delete-config max.message.bytes</b>
 </pre>
 
 The following are the topic-level configurations. The server's default configuration for this property is given under the Server Default Property heading, setting this default in the server config allows you to change the default given to topics that have no override specified.
@@ -106,8 +106,8 @@ The following are the topic-level configurations. The server's default configura
       <td>min.insync.replicas</td>
       <td>1</td>
       <td>min.insync.replicas</td>
-      <td>When a producer sets request.required.acks to -1, min.insync.replicas specifies the minimum number of replicas that must acknowledge a write for the write to be considered successful. If this minimum cannot be met, then the producer will raise an exception (either NotEnoughReplicas or NotEnoughReplicasAfterAppend).
-      When used together, min.insync.replicas and request.required.acks allow you to enforce greater durability guarantees. A typical scenario would be to create a topic with a replication factor of 3, set min.insync.replicas to 2, and produce with request.required.acks of -1. This will ensure that the producer raises an exception if a majority of replicas do not receive a write.</td>
+      <td>When a producer sets acks to "all", min.insync.replicas specifies the minimum number of replicas that must acknowledge a write for the write to be considered successful. If this minimum cannot be met, then the producer will raise an exception (either NotEnoughReplicas or NotEnoughReplicasAfterAppend).
+      When used together, min.insync.replicas and acks allow you to enforce greater durability guarantees. A typical scenario would be to create a topic with a replication factor of 3, set min.insync.replicas to 2, and produce with acks of "all". This will ensure that the producer raises an exception if a majority of replicas do not receive a write.</td>
     </tr>
     <tr>
       <td>retention.bytes</td>
@@ -158,7 +158,12 @@ Below is the configuration of the Java producer:
 </p>
 
 <h3><a id="consumerconfigs" href="#consumerconfigs">3.3 Consumer Configs</a></h3>
-The essential consumer configurations are the following:
+
+We introduce both the old 0.8 consumer configs and the new consumer configs respectively below.
+
+<h4><a id="oldconsumerconfigs" href="#oldconsumerconfigs">3.3.1 Old Consumer Configs</a></h4>
+
+The essential old consumer configurations are the following:
 <ul>
         <li><code>group.id</code>
         <li><code>zookeeper.connect</code>
@@ -327,9 +332,9 @@ The essential consumer configurations are the following:
 
 <p>More details about consumer configuration can be found in the scala class <code>kafka.consumer.ConsumerConfig</code>.</p>
 
-<h3><a id="newconsumerconfigs" href="#newconsumerconfigs">3.4 New Consumer Configs</a></h3>
-Since 0.9.0.0 we have been working on a replacement for our existing simple and high-level consumers. The code can be considered beta quality. Below is the configuration for the new consumer:
+<h4><a id="newconsumerconfigs" href="#newconsumerconfigs">3.3.2 New Consumer Configs</a></h4>
+Since 0.9.0.0 we have been working on a replacement for our existing simple and high-level consumers. The code is considered beta quality. Below is the configuration for the new consumer:
 <!--#include virtual="consumer_config.html" -->
 
-<h3><a id="connectconfigs" href="#connectconfigs">3.5 Kafka Connect Configs</a></h3>
+<h3><a id="connectconfigs" href="#connectconfigs">3.4 Kafka Connect Configs</a></h3>
 <!--#include virtual="connect_config.html" -->

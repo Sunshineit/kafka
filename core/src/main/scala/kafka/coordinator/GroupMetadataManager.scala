@@ -190,25 +190,26 @@ class GroupMetadataManager(val brokerId: Int,
       val status = responseStatus(groupMetadataPartition)
 
       var responseCode = Errors.NONE.code
-      if (status.error != ErrorMapping.NoError) {
+      if (status.error != Errors.NONE.code) {
         debug("Metadata from group %s with generation %d failed when appending to log due to %s"
-          .format(group.groupId, generationId, ErrorMapping.exceptionNameFor(status.error)))
+          .format(group.groupId, generationId, Errors.forCode(status.error).exceptionName))
 
         // transform the log append error code to the corresponding the commit status error code
-        responseCode = if (status.error == ErrorMapping.UnknownTopicOrPartitionCode) {
+        responseCode = if (status.error == Errors.UNKNOWN_TOPIC_OR_PARTITION.code) {
           Errors.GROUP_COORDINATOR_NOT_AVAILABLE.code
-        } else if (status.error == ErrorMapping.NotLeaderForPartitionCode) {
+        } else if (status.error == Errors.NOT_LEADER_FOR_PARTITION.code) {
           Errors.NOT_COORDINATOR_FOR_GROUP.code
-        } else if (status.error == ErrorMapping.MessageSizeTooLargeCode
-          || status.error == ErrorMapping.MessageSetSizeTooLargeCode
-          || status.error == ErrorMapping.InvalidFetchSizeCode) {
+        } else if (status.error == Errors.REQUEST_TIMED_OUT.code) {
+          Errors.REBALANCE_IN_PROGRESS.code
+        } else if (status.error == Errors.MESSAGE_TOO_LARGE.code
+          || status.error == Errors.RECORD_LIST_TOO_LARGE.code
+          || status.error == Errors.INVALID_FETCH_SIZE.code) {
 
           error("Appending metadata message for group %s generation %d failed due to %s, returning UNKNOWN error code to the client"
-            .format(group.groupId, generationId, ErrorMapping.exceptionNameFor(status.error)))
+            .format(group.groupId, generationId, Errors.forCode(status.error).exceptionName))
 
           Errors.UNKNOWN.code
         } else {
-
           error("Appending metadata message for group %s generation %d failed due to unexpected error: %s"
             .format(group.groupId, generationId, status.error))
 
@@ -270,23 +271,23 @@ class GroupMetadataManager(val brokerId: Int,
       val status = responseStatus(offsetTopicPartition)
 
       val responseCode =
-        if (status.error == ErrorMapping.NoError) {
+        if (status.error == Errors.NONE.code) {
           filteredOffsetMetadata.foreach { case (topicAndPartition, offsetAndMetadata) =>
             putOffset(GroupTopicPartition(groupId, topicAndPartition), offsetAndMetadata)
           }
-          ErrorMapping.NoError
+          Errors.NONE.code
         } else {
           debug("Offset commit %s from group %s consumer %s with generation %d failed when appending to log due to %s"
-            .format(filteredOffsetMetadata, groupId, consumerId, generationId, ErrorMapping.exceptionNameFor(status.error)))
+            .format(filteredOffsetMetadata, groupId, consumerId, generationId, Errors.forCode(status.error).exceptionName))
 
           // transform the log append error code to the corresponding the commit status error code
-          if (status.error == ErrorMapping.UnknownTopicOrPartitionCode)
-            ErrorMapping.ConsumerCoordinatorNotAvailableCode
-          else if (status.error == ErrorMapping.NotLeaderForPartitionCode)
-            ErrorMapping.NotCoordinatorForConsumerCode
-          else if (status.error == ErrorMapping.MessageSizeTooLargeCode
-            || status.error == ErrorMapping.MessageSetSizeTooLargeCode
-            || status.error == ErrorMapping.InvalidFetchSizeCode)
+          if (status.error == Errors.UNKNOWN_TOPIC_OR_PARTITION.code)
+            Errors.GROUP_COORDINATOR_NOT_AVAILABLE.code
+          else if (status.error == Errors.NOT_LEADER_FOR_PARTITION.code)
+            Errors.NOT_COORDINATOR_FOR_GROUP.code
+          else if (status.error == Errors.MESSAGE_TOO_LARGE.code
+            || status.error == Errors.RECORD_LIST_TOO_LARGE.code
+            || status.error == Errors.INVALID_FETCH_SIZE.code)
             Errors.INVALID_COMMIT_OFFSET_SIZE.code
           else
             status.error
@@ -298,7 +299,7 @@ class GroupMetadataManager(val brokerId: Int,
         if (validateOffsetMetadataLength(offsetAndMetadata.metadata))
           (topicAndPartition, responseCode)
         else
-          (topicAndPartition, ErrorMapping.OffsetMetadataTooLargeCode)
+          (topicAndPartition, Errors.OFFSET_METADATA_TOO_LARGE.code)
       }
 
       // finally trigger the callback logic passed from the API layer
@@ -319,7 +320,7 @@ class GroupMetadataManager(val brokerId: Int,
       if (topicPartitions.isEmpty) {
         // Return offsets for all partitions owned by this consumer group. (this only applies to consumers that commit offsets to Kafka.)
         offsetsCache.filter(_._1.group == group).map { case(groupTopicPartition, offsetAndMetadata) =>
-          (groupTopicPartition.topicPartition, OffsetMetadataAndError(offsetAndMetadata.offset, offsetAndMetadata.metadata, ErrorMapping.NoError))
+          (groupTopicPartition.topicPartition, OffsetMetadataAndError(offsetAndMetadata.offset, offsetAndMetadata.metadata, Errors.NONE.code))
         }.toMap
       } else {
         topicPartitions.map { topicAndPartition =>
@@ -488,9 +489,11 @@ class GroupMetadataManager(val brokerId: Int,
 
         // clear the groups for this partition in the cache
         for (group <- groupsCache.values) {
-          onGroupUnloaded(group)
-          groupsCache.remove(group.groupId, group)
-          numGroupsRemoved += 1
+          if (partitionFor(group.groupId) == offsetsPartition) {
+            onGroupUnloaded(group)
+            groupsCache.remove(group.groupId, group)
+            numGroupsRemoved += 1
+          }
         }
       }
 
@@ -513,7 +516,7 @@ class GroupMetadataManager(val brokerId: Int,
     if (offsetAndMetadata == null)
       OffsetMetadataAndError.NoOffset
     else
-      OffsetMetadataAndError(offsetAndMetadata.offset, offsetAndMetadata.metadata, ErrorMapping.NoError)
+      OffsetMetadataAndError(offsetAndMetadata.offset, offsetAndMetadata.metadata, Errors.NONE.code)
   }
 
   /**
@@ -561,7 +564,7 @@ class GroupMetadataManager(val brokerId: Int,
           trace("Marked %d offsets in %s for deletion.".format(messages.size, appendPartition))
 
           try {
-            // do not need to require acks since even if the tombsone is lost,
+            // do not need to require acks since even if the tombstone is lost,
             // it will be appended again in the next purge cycle
             partition.appendMessagesToLeader(new ByteBufferMessageSet(config.offsetsTopicCompressionCodec, messages: _*))
             tombstones.size
@@ -844,10 +847,10 @@ object GroupMetadataManager {
    * @param buffer input byte-buffer
    * @return an GroupTopicPartition object
    */
-  private def readMessageKey(buffer: ByteBuffer): BaseKey = {
+  def readMessageKey(buffer: ByteBuffer): BaseKey = {
     val version = buffer.getShort
     val keySchema = schemaForKey(version)
-    val key = keySchema.read(buffer).asInstanceOf[Struct]
+    val key = keySchema.read(buffer)
 
     if (version <= CURRENT_OFFSET_KEY_SCHEMA_VERSION) {
       // version 0 and 1 refer to offset
@@ -873,13 +876,13 @@ object GroupMetadataManager {
    * @param buffer input byte-buffer
    * @return an offset-metadata object from the message
    */
-  private def readOffsetMessageValue(buffer: ByteBuffer): OffsetAndMetadata = {
+  def readOffsetMessageValue(buffer: ByteBuffer): OffsetAndMetadata = {
     if(buffer == null) { // tombstone
       null
     } else {
       val version = buffer.getShort
       val valueSchema = schemaForOffset(version)
-      val value = valueSchema.read(buffer).asInstanceOf[Struct]
+      val value = valueSchema.read(buffer)
 
       if (version == 0) {
         val offset = value.get(OFFSET_VALUE_OFFSET_FIELD_V0).asInstanceOf[Long]
@@ -906,13 +909,13 @@ object GroupMetadataManager {
    * @param buffer input byte-buffer
    * @return a group metadata object from the message
    */
-  private def readGroupMessageValue(groupId: String, buffer: ByteBuffer): GroupMetadata = {
+  def readGroupMessageValue(groupId: String, buffer: ByteBuffer): GroupMetadata = {
     if(buffer == null) { // tombstone
       null
     } else {
       val version = buffer.getShort
       val valueSchema = schemaForGroup(version)
-      val value = valueSchema.read(buffer).asInstanceOf[Struct]
+      val value = valueSchema.read(buffer)
 
       if (version == 0) {
         val protocolType = value.get(GROUP_METADATA_PROTOCOL_TYPE_V0).asInstanceOf[String]

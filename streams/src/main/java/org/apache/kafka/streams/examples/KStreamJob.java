@@ -34,7 +34,7 @@ public class KStreamJob {
 
     public static void main(String[] args) throws Exception {
         Properties props = new Properties();
-        props.put(StreamingConfig.CLIENT_ID_CONFIG, "Example-KStream-Job");
+        props.put(StreamingConfig.JOB_ID_CONFIG, "example-kstream");
         props.put(StreamingConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         props.put(StreamingConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(StreamingConfig.VALUE_SERIALIZER_CLASS_CONFIG, IntegerSerializer.class);
@@ -45,7 +45,7 @@ public class KStreamJob {
 
         KStreamBuilder builder = new KStreamBuilder();
 
-        KStream<String, String> stream1 = builder.from("topic1");
+        KStream<String, String> stream1 = builder.stream("topic1");
 
         KStream<String, Integer> stream2 =
             stream1.map(new KeyValueMapper<String, String, KeyValue<String, Integer>>() {

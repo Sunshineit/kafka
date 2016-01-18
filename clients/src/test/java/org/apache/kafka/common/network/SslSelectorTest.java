@@ -18,7 +18,6 @@ import static org.junit.Assert.assertTrue;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.io.File;
@@ -56,7 +55,7 @@ public class SslSelectorTest extends SelectorTest {
         this.channelBuilder = new SslChannelBuilder(Mode.CLIENT);
         this.channelBuilder.configure(sslClientConfigs);
         this.metrics = new Metrics();
-        this.selector = new Selector(5000, metrics, time, "MetricGroup", new LinkedHashMap<String, String>(), channelBuilder);
+        this.selector = new Selector(5000, metrics, time, "MetricGroup", channelBuilder);
     }
 
     @After
@@ -84,7 +83,7 @@ public class SslSelectorTest extends SelectorTest {
             }
         };
         channelBuilder.configure(sslClientConfigs);
-        Selector selector = new Selector(5000, metrics, time, "MetricGroup2", new LinkedHashMap<String, String>(), channelBuilder);
+        Selector selector = new Selector(5000, metrics, time, "MetricGroup2", channelBuilder);
         try {
             int reqs = 500;
             String node = "0";
@@ -158,7 +157,7 @@ public class SslSelectorTest extends SelectorTest {
     }
 
     /**
-     * Connects and waits for handshake to complete. This is required since SSLTransportLayer
+     * Connects and waits for handshake to complete. This is required since SslTransportLayer
      * implementation requires the channel to be ready before send is invoked (unlike plaintext
      * where send can be invoked straight after connect)
      */
